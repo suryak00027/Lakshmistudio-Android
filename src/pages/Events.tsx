@@ -54,7 +54,7 @@ export function Events() {
       .from('events')
       .select('event_date,status')
       .gte('event_date', `${year}-${month}-01`)
-      .lte('event_date', `${year}-${month}-31`)
+      .lte('event_date', `${year}-${month}-${new Date(year, Number(month), 0).getDate()}`)
       .neq('status', 'Cancelled');
     const counts: Record<string, number> = {};
     (calData || []).forEach((e: Record<string, unknown>) => {
@@ -66,8 +66,8 @@ export function Events() {
   }, [statusFilter, search, calendarDate]);
 
   useEffect(() => {
-    const t = setTimeout(fetchEvents, 200);
-    return () => clearTimeout(t);
+    const timer = setTimeout(fetchEvents, 200);
+    return () => clearTimeout(timer);
   }, [fetchEvents]);
 
   if (selectedEvent) {
@@ -593,7 +593,7 @@ function NewEventForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
               <div>
                 <label className="label">Event Type</label>
                 <select className="input" value={eventType} onChange={(e) => setEventType(e.target.value)}>
-                  {EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  {[...EVENT_TYPES, ...(settings?.custom_event_types || [])].map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div>
@@ -766,7 +766,7 @@ function EventDetail({ event, onBack }: { event: EventRecord; onBack: () => void
     fetchData();
   }, [fetchData]);
 
-  const totalReceived = Number(event.advance_received) + payments.reduce((s, p) => s + Number(p.amount), 0);
+  const totalReceived = payments.reduce((s, p) => s + Number(p.amount), 0);
   const balance = Number(event.total_amount) - totalReceived;
 
   const handleAssign = async () => {
@@ -796,7 +796,12 @@ function EventDetail({ event, onBack }: { event: EventRecord; onBack: () => void
   };
 
   const handleRemoveStaff = async (id: string) => {
-    await supabase.from('event_staff').delete().eq('id', id);
+    const { error } = await supabase.from('event_staff').delete().eq('id', id);
+    if (error) {
+      const info = logSupabaseError(error, 'Remove staff from event');
+      show(getErrorToastMessage(info), 'error');
+      return;
+    }
     show('Staff removed');
     fetchData();
   };
@@ -831,13 +836,23 @@ function EventDetail({ event, onBack }: { event: EventRecord; onBack: () => void
   };
 
   const handleStatusChange = async (newStatus: string) => {
-    await supabase.from('events').update({ status: newStatus }).eq('id', event.id);
+    const { error } = await supabase.from('events').update({ status: newStatus }).eq('id', event.id);
+    if (error) {
+      const info = logSupabaseError(error, 'Update event status');
+      show(getErrorToastMessage(info), 'error');
+      return;
+    }
     setStatusUpdate(newStatus);
     show('Status updated');
   };
 
   const handleDelete = async () => {
-    await supabase.from('events').delete().eq('id', event.id);
+    const { error } = await supabase.from('events').delete().eq('id', event.id);
+    if (error) {
+      const info = logSupabaseError(error, 'Delete event');
+      show(getErrorToastMessage(info), 'error');
+      return;
+    }
     show('Event deleted');
     onBack();
   };

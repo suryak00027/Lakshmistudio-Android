@@ -6,6 +6,7 @@ export interface Settings {
   address: string;
   max_events_per_day: number;
   logo_url: string;
+  custom_event_types: string[];
   created_at: string;
   updated_at: string;
 }

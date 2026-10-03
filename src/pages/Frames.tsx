@@ -447,7 +447,7 @@ function OrderDetail({ order, onBack }: { order: FrameOrder; onBack: () => void 
     })();
   }, [order.id]);
 
-  const totalReceived = Number(order.amount_received) + payments.reduce((s, p) => s + Number(p.amount), 0);
+  const totalReceived = payments.reduce((s, p) => s + Number(p.amount), 0);
   const balance = Number(order.total_price) - totalReceived;
 
   const handleAddPayment = async () => {
@@ -460,14 +460,23 @@ function OrderDetail({ order, onBack }: { order: FrameOrder; onBack: () => void 
       show('Payment cannot be greater than the balance due.', 'error');
       return;
     }
-    await supabase.from('payments').insert({
+    const { error: payError } = await supabase.from('payments').insert({
       frame_order_id: order.id,
       amount,
       payment_method: payMethod,
       payment_date: todayISO(),
       note: 'Order payment',
     });
-    await supabase.from('frame_orders').update({ balance: balance - amount }).eq('id', order.id);
+    if (payError) {
+      const info = logSupabaseError(payError, 'Record frame order payment');
+      show(getErrorToastMessage(info), 'error');
+      return;
+    }
+    const { error: updateError } = await supabase.from('frame_orders').update({ balance: balance - amount }).eq('id', order.id);
+    if (updateError) {
+      const info = logSupabaseError(updateError, 'Update frame order balance');
+      show(getErrorToastMessage(info), 'error');
+    }
     show('Payment recorded');
     setShowPayment(false);
     setPayAmount('');
@@ -476,13 +485,23 @@ function OrderDetail({ order, onBack }: { order: FrameOrder; onBack: () => void 
   };
 
   const handleStatusChange = async (newStatus: string) => {
-    await supabase.from('frame_orders').update({ status: newStatus }).eq('id', order.id);
+    const { error } = await supabase.from('frame_orders').update({ status: newStatus }).eq('id', order.id);
+    if (error) {
+      const info = logSupabaseError(error, 'Update frame order status');
+      show(getErrorToastMessage(info), 'error');
+      return;
+    }
     setStatus(newStatus);
     show('Status updated');
   };
 
   const handleDelete = async () => {
-    await supabase.from('frame_orders').delete().eq('id', order.id);
+    const { error } = await supabase.from('frame_orders').delete().eq('id', order.id);
+    if (error) {
+      const info = logSupabaseError(error, 'Delete frame order');
+      show(getErrorToastMessage(info), 'error');
+      return;
+    }
     show('Order deleted');
     onBack();
   };

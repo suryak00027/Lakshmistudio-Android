@@ -279,7 +279,7 @@ function StaffProfile({ staffId, onBack }: { staffId: string; onBack: () => void
   const fetchAll = useCallback(async () => {
     const [staffData, attData, salData, advData, esData, eventsData] = await Promise.all([
       supabase.from('staff').select('*').eq('id', staffId).maybeSingle(),
-      supabase.from('attendance').select('*').eq('staff_id', staffId).gte('attendance_date', `${attendanceMonth}-01`).lte('attendance_date', `${attendanceMonth}-31`),
+      supabase.from('attendance').select('*').eq('staff_id', staffId).gte('attendance_date', `${attendanceMonth}-01`).lte('attendance_date', `${attendanceMonth}-${new Date(Number(attendanceMonth.split('-')[0]), Number(attendanceMonth.split('-')[1]), 0).getDate()}`),
       supabase.from('salary_records').select('*').eq('staff_id', staffId).order('payment_date', { ascending: false }),
       supabase.from('salary_advances').select('*').eq('staff_id', staffId).order('advance_date', { ascending: false }),
       supabase.from('event_staff').select('*').eq('staff_id', staffId),
@@ -306,13 +306,11 @@ function StaffProfile({ staffId, onBack }: { staffId: string; onBack: () => void
   const markAttendance = async (date: string, status: string) => {
     const existing = attendance.find((a) => a.attendance_date === date);
     if (existing) {
-      await supabase.from('attendance').update({ status }).eq('id', existing.id);
+      const { error } = await supabase.from('attendance').update({ status }).eq('id', existing.id);
+      if (error) { const info = logSupabaseError(error, 'Mark attendance'); show(getErrorToastMessage(info), 'error'); return; }
     } else {
-      await supabase.from('attendance').insert({
-        staff_id: staffId,
-        attendance_date: date,
-        status,
-      });
+      const { error } = await supabase.from('attendance').insert({ staff_id: staffId, attendance_date: date, status });
+      if (error) { const info = logSupabaseError(error, 'Mark attendance'); show(getErrorToastMessage(info), 'error'); return; }
     }
     fetchAll();
   };
@@ -323,13 +321,14 @@ function StaffProfile({ staffId, onBack }: { staffId: string; onBack: () => void
       show(t('staff.enterValidAmount'), 'error');
       return;
     }
-    await supabase.from('salary_records').insert({
+    const { error } = await supabase.from('salary_records').insert({
       staff_id: staffId,
       amount,
       month: currentMonthISO(),
       note: salNote,
       payment_date: todayISO(),
     });
+    if (error) { const info = logSupabaseError(error, 'Salary payment'); show(getErrorToastMessage(info), 'error'); return; }
     show(t('staff.salaryPaymentRecorded'));
     setShowSalaryPayment(false);
     setSalAmount('');
@@ -343,12 +342,13 @@ function StaffProfile({ staffId, onBack }: { staffId: string; onBack: () => void
       show(t('staff.enterValidAmount'), 'error');
       return;
     }
-    await supabase.from('salary_advances').insert({
+    const { error } = await supabase.from('salary_advances').insert({
       staff_id: staffId,
       amount,
       note: advanceNote,
       advance_date: todayISO(),
     });
+    if (error) { const info = logSupabaseError(error, 'Salary advance'); show(getErrorToastMessage(info), 'error'); return; }
     show(t('staff.salaryAdvanceRecorded'));
     setShowSalaryAdvance(false);
     setAdvanceAmount('');
@@ -357,7 +357,8 @@ function StaffProfile({ staffId, onBack }: { staffId: string; onBack: () => void
   };
 
   const handleDelete = async () => {
-    await supabase.from('staff').delete().eq('id', staffId);
+    const { error } = await supabase.from('staff').delete().eq('id', staffId);
+    if (error) { const info = logSupabaseError(error, 'Delete staff'); show(getErrorToastMessage(info), 'error'); return; }
     show(t('staff.memberRemoved'));
     onBack();
   };

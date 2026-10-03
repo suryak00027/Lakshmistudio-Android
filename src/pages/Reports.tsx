@@ -58,25 +58,21 @@ export function Reports() {
       dateEnd = endDate;
     }
 
-    const [bills, events, orders, expenses, payments] = await Promise.all([
+    const [bills, events, orders, expenses, pendingBills, pendingEvents, pendingOrders] = await Promise.all([
       supabase.from('bills').select('amount_received,total_amount,bill_date').gte('bill_date', dateStart).lte('bill_date', dateEnd),
       supabase.from('events').select('advance_received,total_amount,event_date,status').gte('event_date', dateStart).lte('event_date', dateEnd),
       supabase.from('frame_orders').select('amount_received,total_price,created_at,status').gte('created_at', `${dateStart}T00:00:00`).lte('created_at', `${dateEnd}T23:59:59`),
       supabase.from('expenses').select('amount,expense_date').gte('expense_date', dateStart).lte('expense_date', dateEnd),
-      supabase.from('payments').select('amount,payment_date').gte('payment_date', dateStart).lte('payment_date', dateEnd),
+      supabase.from('bills').select('balance').gt('balance', 0),
+      supabase.from('events').select('balance').gt('balance', 0).neq('status', 'Cancelled'),
+      supabase.from('frame_orders').select('balance').gt('balance', 0).neq('status', 'Cancelled'),
     ]);
 
     const studioSales = (bills.data || []).reduce((s: number, b: Record<string, unknown>) => s + Number(b.amount_received), 0);
     const eventSales = (events.data || []).filter((e: Record<string, unknown>) => e.status !== 'Cancelled').reduce((s: number, e: Record<string, unknown>) => s + Number(e.advance_received), 0);
     const frameSales = (orders.data || []).filter((o: Record<string, unknown>) => o.status !== 'Cancelled').reduce((s: number, o: Record<string, unknown>) => s + Number(o.amount_received), 0);
-    const paymentSales = (payments.data || []).reduce((s: number, p: Record<string, unknown>) => s + Number(p.amount), 0);
-
-    const totalSales = studioSales + eventSales + frameSales + paymentSales;
+    const totalSales = studioSales + eventSales + frameSales;
     const totalExpenses = (expenses.data || []).reduce((s: number, e: Record<string, unknown>) => s + Number(e.amount), 0);
-
-    const pendingBills = await supabase.from('bills').select('balance').gt('balance', 0);
-    const pendingEvents = await supabase.from('events').select('balance').gt('balance', 0).neq('status', 'Cancelled');
-    const pendingOrders = await supabase.from('frame_orders').select('balance').gt('balance', 0).neq('status', 'Cancelled');
     const pending =
       (pendingBills.data || []).reduce((s: number, b: Record<string, unknown>) => s + Number(b.balance), 0) +
       (pendingEvents.data || []).reduce((s: number, e: Record<string, unknown>) => s + Number(e.balance), 0) +

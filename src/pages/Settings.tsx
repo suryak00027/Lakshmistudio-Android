@@ -54,6 +54,7 @@ export function SettingsPage() {
       setMaxEvents(String(s.max_events_per_day));
       setLogoUrl(s.logo_url || '');
       setLogoPreview(s.logo_url || null);
+      setCustomEventTypes(s.custom_event_types || []);
     }
     setServices((svcData.data || []) as Service[]);
     setLoading(false);
@@ -146,32 +147,64 @@ export function SettingsPage() {
   const handleUpdateServicePrice = async (id: string, price: string) => {
     const val = parseFloat(price) || 0;
     if (val < 0) return;
-    await supabase.from('services').update({ price: val }).eq('id', id);
+    const { error } = await supabase.from('services').update({ price: val }).eq('id', id);
+    if (error) {
+      const info = logSupabaseError(error, 'Update service price');
+      show(getErrorToastMessage(info), 'error');
+      return;
+    }
     setServices((prev) => prev.map((s) => (s.id === id ? { ...s, price: val } : s)));
   };
 
   const handleDeleteService = async () => {
-    if (!deleteServiceId) return;
-    await supabase.from('services').delete().eq('id', deleteServiceId);
+    if (!deleteServiceId || !settings) return;
+    const { error } = await supabase.from('services').delete().eq('id', deleteServiceId);
+    if (error) {
+      const info = logSupabaseError(error, 'Delete service');
+      show(getErrorToastMessage(info), 'error');
+      return;
+    }
     show(t('settings.serviceRemoved'));
     setDeleteServiceId(null);
     fetchAll();
   };
 
-  const handleAddEventType = () => {
+  const handleAddEventType = async () => {
+    if (!settings) return;
     const trimmed = newEventType.trim();
     if (!trimmed) return;
     if (customEventTypes.includes(trimmed) || (EVENT_TYPES as readonly string[]).includes(trimmed)) {
       show(t('settings.eventTypeExists'), 'error');
       return;
     }
-    setCustomEventTypes((prev) => [...prev, trimmed]);
+    const updated = [...customEventTypes, trimmed];
+    const { error } = await supabase
+      .from('settings')
+      .update({ custom_event_types: updated })
+      .eq('id', settings.id);
+    if (error) {
+      const info = logSupabaseError(error, 'Add custom event type');
+      show(getErrorToastMessage(info), 'error');
+      return;
+    }
+    setCustomEventTypes(updated);
     setNewEventType('');
     show(t('settings.eventTypeAdded'));
   };
 
-  const handleRemoveEventType = (type: string) => {
-    setCustomEventTypes((prev) => prev.filter((t) => t !== type));
+  const handleRemoveEventType = async (type: string) => {
+    if (!settings) return;
+    const updated = customEventTypes.filter((t) => t !== type);
+    const { error } = await supabase
+      .from('settings')
+      .update({ custom_event_types: updated })
+      .eq('id', settings.id);
+    if (error) {
+      const info = logSupabaseError(error, 'Remove custom event type');
+      show(getErrorToastMessage(info), 'error');
+      return;
+    }
+    setCustomEventTypes(updated);
   };
 
   if (loading) return <LoadingState />;
@@ -384,7 +417,7 @@ export function SettingsPage() {
 
       <ConfirmDialog
         open={!!deleteServiceId}
-        title={t('settings.serviceRemoved')}
+        title="Remove Service"
         message="Are you sure you want to remove this service?"
         confirmLabel={t('common.remove')}
         danger

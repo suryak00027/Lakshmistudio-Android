@@ -103,7 +103,12 @@ export function Expenses() {
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from('expenses').delete().eq('id', id);
+    const { error } = await supabase.from('expenses').delete().eq('id', id);
+    if (error) {
+      const info = logSupabaseError(error, 'Delete expense');
+      show(getErrorToastMessage(info), 'error');
+      return;
+    }
     show('Expense deleted');
     setConfirmDelete(null);
     fetchExpenses();

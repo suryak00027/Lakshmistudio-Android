@@ -309,32 +309,7 @@ function NewBillForm({
     const customerName = walkIn ? 'Walk-in Customer' : selectedCustomer?.name || 'Walk-in Customer';
     const customerPhone = walkIn ? '' : selectedCustomer?.phone || '';
 
-    const { data: billData, error: billError } = await supabase
-      .from('bills')
-      .insert({
-        bill_number: billNumber,
-        customer_id: walkIn ? null : selectedCustomer?.id || null,
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        total_amount: total,
-        amount_received: received,
-        balance: balance,
-        payment_method: paymentMethod,
-        bill_date: todayISO(),
-      })
-      .select()
-      .single();
-
-    if (billError || !billData) {
-      const info = logSupabaseError(billError, 'Create bill');
-      show(getErrorToastMessage(info), 'error');
-      setSaving(false);
-      return;
-    }
-
-    const savedBill = billData as Bill;
-    const itemsToInsert = items.map((i) => ({
-      bill_id: savedBill.id,
+    const itemsJson = items.map((i) => ({
       service_name: i.service_name,
       variant: i.variant,
       quantity: i.quantity,
@@ -342,22 +317,38 @@ function NewBillForm({
       discount: i.discount,
       total: i.total,
     }));
-    await supabase.from('bill_items').insert(itemsToInsert);
 
-    if (received > 0) {
-      await supabase.from('payments').insert({
-        bill_id: savedBill.id,
-        amount: received,
-        payment_method: paymentMethod,
-        payment_date: todayISO(),
-        note: 'Initial payment',
+    const { data: rpcResult, error: rpcError } = await supabase
+      .rpc('create_bill_with_items', {
+        p_bill_number: billNumber,
+        p_customer_id: walkIn ? null : selectedCustomer?.id || null,
+        p_customer_name: customerName,
+        p_customer_phone: customerPhone,
+        p_total_amount: total,
+        p_amount_received: received,
+        p_balance: balance,
+        p_payment_method: paymentMethod,
+        p_bill_date: todayISO(),
+        p_items: itemsJson,
       });
+
+    if (rpcError || !rpcResult?.bill_id) {
+      const info = logSupabaseError(rpcError, 'Create bill (RPC)');
+      show(getErrorToastMessage(info), 'error');
+      setSaving(false);
+      return;
     }
 
+    const { data: savedBillData } = await supabase
+      .from('bills')
+      .select('*')
+      .eq('id', rpcResult.bill_id)
+      .single();
+    const savedBill = savedBillData as Bill;
     const { data: savedItems } = await supabase
       .from('bill_items')
       .select('*')
-      .eq('bill_id', savedBill.id);
+      .eq('bill_id', rpcResult.bill_id);
     show('Bill saved successfully');
     setSaving(false);
     onSaved(savedBill, (savedItems || []) as BillItem[]);

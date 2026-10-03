@@ -209,8 +209,7 @@ function CustomerProfile({ customerId, onBack }: { customerId: string; onBack: (
   const totalPaid =
     bills.reduce((s, b) => s + Number(b.amount_received), 0) +
     events.reduce((s, e) => s + Number(e.advance_received), 0) +
-    orders.reduce((s, o) => s + Number(o.amount_received), 0) +
-    payments.reduce((s, p) => s + Number(p.amount), 0);
+    orders.reduce((s, o) => s + Number(o.amount_received), 0);
   const totalPending = totalBusiness - totalPaid;
 
   return (
