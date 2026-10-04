@@ -55,8 +55,8 @@ export function Studio() {
   }, [filter, search]);
 
   useEffect(() => {
-    const t = setTimeout(fetchBills, 200);
-    return () => clearTimeout(t);
+    const timer = setTimeout(fetchBills, 200);
+    return () => clearTimeout(timer);
   }, [fetchBills]);
 
   const handleBillSaved = (bill: Bill, items: BillItem[]) => {

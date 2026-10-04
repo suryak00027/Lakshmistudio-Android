@@ -45,11 +45,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     const today = todayISO();
     const month = currentMonthISO();
 
-    const [billsToday, expensesToday, billsMonth, eventsToday, eventsUpcoming, frames, settingsData, eventCountData, pendingBills, pendingEvents, pendingFrames] =
+    const lastDayOfMonth = new Date(Number(month.split('-')[0]), Number(month.split('-')[1]), 0).getDate();
+    const [paymentsToday, expensesToday, paymentsMonth, eventsToday, eventsUpcoming, frames, settingsData, eventCountData, pendingBills, pendingEvents, pendingFrames] =
       await Promise.all([
-        supabase.from('bills').select('amount_received').eq('bill_date', today),
+        supabase.from('payments').select('amount').eq('payment_date', today),
         supabase.from('expenses').select('amount').eq('expense_date', today),
-        supabase.from('bills').select('amount_received, bill_date').gte('bill_date', `${month}-01`),
+        supabase.from('payments').select('amount, payment_date').gte('payment_date', `${month}-01`).lte('payment_date', `${month}-${lastDayOfMonth}`),
         supabase.from('events').select('*').eq('event_date', today).neq('status', 'Cancelled').order('start_time'),
         supabase.from('events').select('*').gt('event_date', today).neq('status', 'Cancelled').order('event_date').limit(5),
         supabase.from('frame_orders').select('*').neq('status', 'Delivered').neq('status', 'Cancelled').order('delivery_date', { ascending: true }).limit(5),
@@ -60,9 +61,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         supabase.from('frame_orders').select('balance').gt('balance', 0).neq('status', 'Cancelled'),
       ]);
 
-    const todaySales = (billsToday.data || []).reduce((s, b: Record<string, unknown>) => s + Number(b.amount_received), 0);
+    const todaySales = (paymentsToday.data || []).reduce((s, p: Record<string, unknown>) => s + Number(p.amount), 0);
     const todayExp = (expensesToday.data || []).reduce((s, e: Record<string, unknown>) => s + Number(e.amount), 0);
-    const monthSales = (billsMonth.data || []).reduce((s, b: Record<string, unknown>) => s + Number(b.amount_received), 0);
+    const monthSales = (paymentsMonth.data || []).reduce((s, p: Record<string, unknown>) => s + Number(p.amount), 0);
     const pending =
       (pendingBills.data || []).reduce((s: number, b: Record<string, unknown>) => s + Number(b.balance), 0) +
       (pendingEvents.data || []).reduce((s: number, e: Record<string, unknown>) => s + Number(e.balance), 0) +

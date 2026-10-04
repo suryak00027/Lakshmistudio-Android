@@ -65,8 +65,8 @@ export function Expenses() {
   }, [categoryFilter, search]);
 
   useEffect(() => {
-    const t = setTimeout(fetchExpenses, 200);
-    return () => clearTimeout(t);
+    const timer = setTimeout(fetchExpenses, 200);
+    return () => clearTimeout(timer);
   }, [fetchExpenses]);
 
   const today = todayISO();

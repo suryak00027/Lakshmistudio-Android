@@ -21,6 +21,7 @@ export function Customers() {
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newNotes, setNewNotes] = useState('');
+  const [saving, setSaving] = useState(false);
   const { show } = useToast();
 
   const fetchCustomers = useCallback(async () => {
@@ -31,8 +32,8 @@ export function Customers() {
   }, [search]);
 
   useEffect(() => {
-    const t = setTimeout(fetchCustomers, 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(fetchCustomers, 300);
+    return () => clearTimeout(timer);
   }, [fetchCustomers]);
 
   const handleAdd = async () => {
@@ -40,6 +41,7 @@ export function Customers() {
       show(t('customers.enterName' as never), 'error');
       return;
     }
+    setSaving(true);
     const { error } = await supabase.from('customers').insert({
       name: newName.trim(),
       phone: newPhone.trim(),
@@ -48,6 +50,7 @@ export function Customers() {
     if (error) {
       const info = logSupabaseError(error, 'Add customer');
       show(getErrorToastMessage(info), 'error');
+      setSaving(false);
       return;
     }
     show(t('customers.addedSuccess' as never));
@@ -55,6 +58,7 @@ export function Customers() {
     setNewName('');
     setNewPhone('');
     setNewNotes('');
+    setSaving(false);
     fetchCustomers();
   };
 
@@ -163,8 +167,8 @@ export function Customers() {
             <button className="btn btn-secondary flex-1" onClick={() => setShowAdd(false)}>
               Cancel
             </button>
-            <button className="btn btn-primary flex-1" onClick={handleAdd}>
-              {t('customers.addCustomer' as never)}
+            <button className="btn btn-primary flex-1" onClick={handleAdd} disabled={saving}>
+              {saving ? 'Saving...' : t('customers.addCustomer' as never)}
             </button>
           </div>
         </div>
@@ -206,10 +210,7 @@ function CustomerProfile({ customerId, onBack }: { customerId: string; onBack: (
     bills.reduce((s, b) => s + Number(b.total_amount), 0) +
     events.reduce((s, e) => s + Number(e.total_amount), 0) +
     orders.reduce((s, o) => s + Number(o.total_price), 0);
-  const totalPaid =
-    bills.reduce((s, b) => s + Number(b.amount_received), 0) +
-    events.reduce((s, e) => s + Number(e.advance_received), 0) +
-    orders.reduce((s, o) => s + Number(o.amount_received), 0);
+  const totalPaid = payments.reduce((s, p) => s + Number(p.amount), 0);
   const totalPending = totalBusiness - totalPaid;
 
   return (
